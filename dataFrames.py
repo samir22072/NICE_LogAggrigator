@@ -2,79 +2,73 @@ import numpy as np
 import re
 import pandas as pd
 import os
+
+# importing custom modules
 import dataFrames as dfs
 import ascwsFunctions as asf
 import acdFunctions as acf
 import swxevdFunctions as swf
 
 
-def getInfo(input_text):
-    pattern = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}\s[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?,[0-9]+\s+(TRACE|DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|SEVERE|FATAL)\s+[A-Za-z0-9\-\.]+", re.IGNORECASE)
-    return pattern.match(input_text)
-
-
+# function to create a dataframe from a log file
 def createDataframe(file, typelog):
-    f = open(file, 'r')
-
     val = 0
     data = []
-    line = f.readline()
-    while (line):
-        matchObj = getInfo(line)
-        index = matchObj.span()[1]
-        meta = line[0:index]
-        content = line[index:]
+    try:
+        # split the log file into lines
+        file = file[1].split('\n')
 
-        metaList = meta.split()
-        [time, milliseconds] = metaList[1].split(',')
-        metaList.remove(metaList[1])
+        # process each line in the log file
+        for line in file:
+            # remove extra spaces from each line
+            line = re.sub(' +', ' ', line)
+            l = line.split(' ')
+            date = l[0]
+            # only process lines that start with a date
+            if(date!=''):
+                time = l[1].replace(',','-')
+                dateTime = date+" "+time
+                logLevel = l[2]
+                threadId = l[3]
+                content = ' '.join(l[4:])
+                data.append([dateTime,logLevel,threadId,content,typelog])
 
-        date = metaList[0]
-        metaList.remove(metaList[0])
-        metaList.insert(0, date + ' ' + time + "-" + milliseconds);
+        # create a pandas dataframe from the processed data
+        df = pd.DataFrame(data, columns=['DateTime', 'LogLevel', 'Thread', 'content', 'Type'])
+        df['DateTime'] = df['DateTime'].str.rsplit('-', n=1).str[0] + '-' + df['DateTime'].str.rsplit('-', n=1).str[-1].str.zfill(3)
+        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y-%m-%d %H:%M:%S-%f')
 
-        metaList.append(content)
-        metaList.append(typelog)
-        data.append(metaList)
+        return df
 
-        line = f.readline()
-        val += 1
-    df = pd.DataFrame(data, columns=['DateTime', 'LogLevel', 'Thread', 'content', 'Type'])
-    df['DateTime'] = df['DateTime'].str.rsplit('-', n=1).str[0] + '-' + df['DateTime'].str.rsplit('-', n=1).str[
-        -1].str.zfill(3)
-    df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y-%m-%d %H:%M:%S-%f')
+    # handle any exceptions that occur while creating the dataframe
+    except Exception as e:
+        print(f"Error occurred while creating dataframe from file {file}: {e}")
 
-    return df
-
-def initializeDataFrames():
-
-    pathswxevd = str(input("Enter the directory path for swxevd(Leave empty if not applicable):"))
-    pathacd = str(input("Enter the directory path for acd-avaya node(Leave empty if not applicable):"))
-    pathascws = str(input("Enter the directory path for ascws(Leave empty if not applicable):"))
-
-    ascwsList = []
-    acdList = []
-    swxevdList = []
-    if(pathascws):
-        ascwsList = os.listdir(pathascws)
-    if(pathacd):
-        acdList = os.listdir(pathacd)
-    if(pathswxevd):
-        swxevdList = os.listdir(pathswxevd)
+# function to initialize dataframes from log files
+def initializeDataFrames(ascwsList, acdList, swxevdList):
 
     ascwsDataFrames = []
     acdDataFrames = []
     swxevdDataFrames = []
-    if(ascwsList and pathascws):
-        for f in ascwsList:
-            ascwsDataFrames.append(dfs.createDataframe(f'{pathascws}/{f}','ascws'))
 
-    if(acdList and pathacd):
-        for f in acdList:
-            acdDataFrames.append(dfs.createDataframe(f'{pathacd}/{f}','acd'))
+    try:
+        # create dataframes for ASCWS logs
+        if(ascwsList):
+            for f in ascwsList:
+                ascwsDataFrames.append(dfs.createDataframe(f,'ascws'))
 
-    if(swxevdList and pathswxevd):
-        for f in swxevdList:
-            swxevdDataFrames.append(dfs.createDataframe(f'{pathswxevd}/{f}','swxevd'))
+        # create dataframes for ACD logs
+        if(acdList):
+            for f in acdList:
+                acdDataFrames.append(dfs.createDataframe(f,'acd'))
 
-    return [ascwsDataFrames,acdDataFrames,swxevdDataFrames]
+        # create dataframes for SWXEVD logs
+        if(swxevdList):
+            for f in swxevdList:
+                swxevdDataFrames.append(dfs.createDataframe(f,'swxevd'))
+
+    # handle any exceptions that occur while initializing the dataframes
+    except Exception as e:
+        print(f"Error occurred while initializing dataframes: {e}")
+
+    return [ascwsDataFrames, acdDataFrames, swxevdDataFrames]

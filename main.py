@@ -1,17 +1,86 @@
-import pandas as pd
+# Import required libraries
 import dataFrames as dfs
 import queries as q
+import pandas as pd
 import os
+import sys
+import io
+import base64
+from flask import Flask, Response
+from flask_restful import Api, Resource, reqparse, abort
+from werkzeug.datastructures import FileStorage
 
-#'/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/swxevd'
-#/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/acd-avaya'
-#'/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/ascws'
+# Create Flask app and API
+app = Flask(__name__)
+api = Api(app)
 
-#2023-01-27 14:30:21.220 2023-01-27 15:30:21.0
+# Set maximum content length for file uploads
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
+
+# Create a resource for log aggregation
+class LogAggreagator(Resource):
+    def post(self):
+        # Parse input arguments
+        parser = reqparse.RequestParser()
+        parser.add_argument('AgentId', type=str)
+        parser.add_argument('filterList', type=list, location='json')
+        parser.add_argument('startDatetime', type=str)
+        parser.add_argument('endDatetime', type=str)
+        parser.add_argument('threadIds', type=list, location='json')
+        parser.add_argument('logLevels', type=list, location='json')
+        parser.add_argument('files', type=dict, location='json')
+        args = parser.parse_args()
+
+        # Extract input arguments
+        AgentId = args['AgentId']
+        filterList = args['filterList']
+        startDatetime = args['startDatetime']
+        endDatetime = args['endDatetime']
+        threadIds = args['threadIds']
+        logLevels = args['logLevels']
+        files = args['files']
+
+        # Decode and split the file contents
+        x = base64.b64decode(files['ascwsfiles'][0][1]).decode().split('\n')
+
+        # Initialize lists for each type of file
+        ascwsList = []
+        acdList = []
+        swxevdList = []
+
+        # Loop through the ascws files and add them to the ascws list
+        for i in range(len(files['ascwsfiles'])):
+            ascwsList.append((files['ascwsfiles'][i][0], base64.b64decode(files['ascwsfiles'][i][1]).decode()))
+
+        # Loop through the acdavaya files and add them to the acd list
+        for i in range(len(files['acdavayafiles'])):
+            acdList.append((files['acdavayafiles'][i][0], base64.b64decode(files['acdavayafiles'][i][1]).decode()))
+
+        # Loop through the swxevd files and add them to the swxevd list
+        for i in range(len(files['swxevdfiles'])):
+            swxevdList.append((files['swxevdfiles'][i][0], base64.b64decode(files['swxevdfiles'][i][1]).decode()))
+
+        # Initialize data frames for each type of file
+        [ascwsDataFrames, acdDataFrames, swxevdDataFrames] = dfs.initializeDataFrames(ascwsList, acdList, swxevdList)
+
+        # Query the data frames to get agent story
+        agentStory = q.queryFunction(ascwsDataFrames, acdDataFrames, swxevdDataFrames, AgentId, filterList, startDatetime, endDatetime, threadIds, logLevels)
+
+        # Reset index of agent story
+        agentStory.reset_index(inplace=True)
+
+        # Convert agent story to JSON format
+        json = agentStory.to_json(orient='records')
+
+        # Return JSON response
+        return json
+
+# Add the log aggregator resource to the API
+api.add_resource(LogAggreagator, "/")
 
 
-[ascwsDataFrames,acdDataFrames,swxevdDataFrames] = dfs.initializeDataFrames()
-q.queryFunction(ascwsDataFrames,acdDataFrames,swxevdDataFrames)
+if __name__=="__main__":
+    app.run(debug=True)
 
 
 
