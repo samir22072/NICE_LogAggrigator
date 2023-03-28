@@ -2,11 +2,12 @@
 import dataFrames as dfs
 import queries as q
 import pandas as pd
+import visualization as v
 import os
 import sys
 import io
 import base64
-from flask import Flask, Response
+from flask import Flask, Response,jsonify
 from flask_restful import Api, Resource, reqparse, abort
 from werkzeug.datastructures import FileStorage
 
@@ -22,13 +23,13 @@ class LogAggreagator(Resource):
     def post(self):
         # Parse input arguments
         parser = reqparse.RequestParser()
-        parser.add_argument('AgentId', type=str)
-        parser.add_argument('filterList', type=list, location='json')
+        parser.add_argument('AgentId', type=str,help='AgentId is a required field.',required=True)
+        parser.add_argument('filterList', type=list, location='json',help='filterList is required field.',required=True)
         parser.add_argument('startDatetime', type=str)
         parser.add_argument('endDatetime', type=str)
         parser.add_argument('threadIds', type=list, location='json')
         parser.add_argument('logLevels', type=list, location='json')
-        parser.add_argument('files', type=dict, location='json')
+        parser.add_argument('files', type=dict, location='json',help='files is a required field',required=True)
         args = parser.parse_args()
 
         # Extract input arguments
@@ -62,26 +63,36 @@ class LogAggreagator(Resource):
 
         # Initialize data frames for each type of file
         [ascwsDataFrames, acdDataFrames, swxevdDataFrames] = dfs.initializeDataFrames(ascwsList, acdList, swxevdList)
-
         # Query the data frames to get agent story
+        performanceData = q.performanceQuery(swxevdDataFrames)
         agentStory = q.queryFunction(ascwsDataFrames, acdDataFrames, swxevdDataFrames, AgentId, filterList, startDatetime, endDatetime, threadIds, logLevels)
-
+        agentStory = agentStory.astype({"DateTime":str})
         # Reset index of agent story
         agentStory.reset_index(inplace=True)
-
         # Convert agent story to JSON format
         json = agentStory.to_json(orient='records')
+        # val = v.plot(agentStory,'DateTime','LogLevel')
 
+        data = {
+            'performanceData':performanceData,
+            'agentStrory':json
+        }
         # Return JSON response
-        return json
+        return jsonify(data)
+
+
+
+
+
+
 
 # Add the log aggregator resource to the API
 api.add_resource(LogAggreagator, "/")
 
 
+
 if __name__=="__main__":
     app.run(debug=True)
-
 
 
 

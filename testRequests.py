@@ -1,9 +1,10 @@
 import requests
 import os
 import sys
-import os
+from io import BytesIO
 import json
 import base64
+from PIL import Image
 
 pathswxevd = str(input("Enter the directory path for swxevd(Leave empty if not applicable):"))
 pathacd = str(input("Enter the directory path for acd-avaya node(Leave empty if not applicable):"))
@@ -21,12 +22,21 @@ if(pathswxevd):
 
 AgentId = '2'
 
+# 1 - time, 2 - threads, 3 - log levels
 filterList = ['1','2']
+# Send in a list of fields to be filtered by in filtered list...
+
+
 
 startDatetime = "2023-01-27 14:30:21.220"
-endDatetime = "2023-01-27 14:31:21.220"
+endDatetime = "2023-01-27 15:30:21.220"
+# send in starting and ending datetime if 1 chosen.
 
-threadIds = ["receiver.2","Service6"]
+
+# threadIds = []  send in the list of threads you want to be filtered out
+
+
+#
 
 ascwsList = [(f, base64.b64encode(open(f"{pathascws}/{f}", 'rb').read()).decode()) for f in ascwsList]
 acdList = [(f, base64.b64encode(open(f"{pathacd}/{f}", 'rb').read()).decode()) for f in acdList]
@@ -40,14 +50,37 @@ files = {
 
 BASE = "http://127.0.0.1:5000/"
 
-# Refer this for request format
 response = requests.post(BASE, json={
     "AgentId": AgentId,
     "filterList": filterList,
     "startDatetime": startDatetime,
     "endDatetime": endDatetime,
-    "threadIds": threadIds,
+    #"threadIds": threadIds,
     "files": files
 })
+# structure of performance data: [ threadId, customerid, acdid, agentid, agentlogonId, performance_time ]
+print(response.json()['performanceData'])
+# base64_image1 = response.json()['chart']['chart1']
+#
+# decoded_image1 = base64.b64decode(base64_image1)
+# image_bytes = BytesIO(decoded_image1)
+# image1 = Image.open(image_bytes)
+# image1.show()
+#
+# base64_image2 = response.json()['chart']['chart2']
+#
+# decoded_image2 = base64.b64decode(base64_image2)
+# image_bytes = BytesIO(decoded_image2)
+# image2 = Image.open(image_bytes)
+# image2.show()
 
-print(json.dumps(response.json(), indent = 1))
+
+#'/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/swxevd'
+#/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/acd-avaya'
+#'/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/ascws'
+
+#2023-01-27 14:30:21.220
+
+#receiver.2 Service6 indexDeleteSchld1
+
+#TRACE DEBUG
