@@ -9,7 +9,6 @@ import io
 import base64
 from flask import Flask, Response,jsonify
 from flask_restful import Api, Resource, reqparse, abort
-from werkzeug.datastructures import FileStorage
 
 # Create Flask app and API
 app = Flask(__name__)
@@ -77,23 +76,24 @@ class LogAggreagator(Resource):
             'performanceData':performanceData,
             'agentStrory':json
         }
-        # Return JSON response
-        return jsonify(data)
+        if(data):
+            # Return JSON response
+            return jsonify(data)
+        else:
+            return {'Error':'An error was generated'}
 
-
-
-
+    def get(self):
+        return {'Info': 'Get request does not do anything'}
 
 
 
 # Add the log aggregator resource to the API
-api.add_resource(LogAggreagator, "/")
+api.add_resource(LogAggreagator, "/logAggregator")
 
 
 
 if __name__=="__main__":
     app.run(debug=True)
-
 
 
 

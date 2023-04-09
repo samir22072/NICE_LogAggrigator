@@ -50,29 +50,17 @@ files = {
 
 BASE = "http://127.0.0.1:5000/"
 
-response = requests.post(BASE, json={
+response = requests.post(BASE+'logAggregator', json={
     "AgentId": AgentId,
     "filterList": filterList,
     "startDatetime": startDatetime,
     "endDatetime": endDatetime,
-    #"threadIds": threadIds,
+#    "threadIds": threadIds,
     "files": files
 })
 # structure of performance data: [ threadId, customerid, acdid, agentid, agentlogonId, performance_time ]
-print(response.json()['performanceData'])
-# base64_image1 = response.json()['chart']['chart1']
-#
-# decoded_image1 = base64.b64decode(base64_image1)
-# image_bytes = BytesIO(decoded_image1)
-# image1 = Image.open(image_bytes)
-# image1.show()
-#
-# base64_image2 = response.json()['chart']['chart2']
-#
-# decoded_image2 = base64.b64decode(base64_image2)
-# image_bytes = BytesIO(decoded_image2)
-# image2 = Image.open(image_bytes)
-# image2.show()
+print(response.json())
+
 
 
 #'/Users/samirhendre/Desktop/NICE LOG AGGREGTOR/swxevd'
