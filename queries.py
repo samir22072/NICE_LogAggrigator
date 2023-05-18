@@ -60,11 +60,13 @@ def queryFunction(ascwsDataFrames, acdDataFrames, swxevdDataFrames, agentId, fil
             if(startDateTime and endDateTime):
                 agentStoryCopy = queryDateTime(startDateTime, endDateTime, agentStoryCopy)
         if('2' in filterList):
+            print(threadIds)
             if(threadIds):
                 agentStoryCopy = queryThreadId(threadIds, agentStoryCopy)
         if('3' in filterList):
             if(logLevels):
                 agentStoryCopy = queryLogLevel(logLevels, agentStoryCopy)
+        print(agentStoryCopy)
         return agentStoryCopy
     except Exception as e:
         print(f"An error occurred while querying function: {str(e)}")
@@ -83,33 +85,33 @@ def getIds(input_text):
 
 
 def performanceQuery(swxevdDataFrames):
-    df = pd.concat(swxevdDataFrames)
-    df = df.query(f'content.str.contains("STATS: RTA Msg Finished processing")')
-    df.reset_index(inplace=True)
-    performanceData = []
-    for ind in df.index:
-        if(getTotalTime(df['content'][ind]) and getIds(df['content'][ind])):
-            print(df['Thread'][ind])
-            time = getTotalTime(df['content'][ind])
-            [x, y] = time.span()
-            result = int(float(df['content'][ind][x+2:y-1])*1000)
+    if(swxevdDataFrames):
+        df = pd.concat(swxevdDataFrames)
+        df = df.query(f'content.str.contains("STATS: RTA Msg Finished processing")')
+        df.reset_index(inplace=True)
+        performanceData = []
+        for ind in df.index:
+            if(getTotalTime(df['content'][ind]) and getIds(df['content'][ind])):
+                time = getTotalTime(df['content'][ind])
+                [x, y] = time.span()
+                result = int(float(df['content'][ind][x+2:y-1])*1000)
 
-            thread = df['Thread'][ind]
+                thread = df['Thread'][ind]
 
-            ids = getIds(df['content'][ind])
-            [x,y] = ids.span()
-            text = df['content'][ind][x:y]
-            text = text.split(', ')
-            for i in range(len(text)):
-                s = text[i]
-                ind = s.find('=')
-                text[i] = s[ind+1:]
-            customerId = text[0]
-            acdId = text[1]
-            agentId = text[2]
-            agentLogonId = text[3]
+                ids = getIds(df['content'][ind])
+                [x,y] = ids.span()
+                text = df['content'][ind][x:y]
+                text = text.split(', ')
+                for i in range(len(text)):
+                    s = text[i]
+                    ind = s.find('=')
+                    text[i] = s[ind+1:]
+                customerId = text[0]
+                acdId = text[1]
+                agentId = text[2]
+                agentLogonId = text[3]
 
-            performanceData.append([thread,customerId,acdId,agentId,agentLogonId,result])
+                performanceData.append([thread,customerId,acdId,agentId,agentLogonId,result])
 
-    return performanceData
-
+        return performanceData
+    return None

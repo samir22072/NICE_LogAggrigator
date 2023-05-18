@@ -9,6 +9,12 @@ import ascwsFunctions as asf
 import acdFunctions as acf
 import swxevdFunctions as swf
 
+# function to extract information from a log file
+def getInfo(input_text):
+    pattern = re.compile(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?,[0-9]+\s+(TRACE|DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|SEVERE|FATAL)\s+[A-Za-z0-9]+",
+        re.IGNORECASE)
+    return pattern.match(input_text)
 
 # function to create a dataframe from a log file
 def createDataframe(file, typelog):
@@ -16,7 +22,8 @@ def createDataframe(file, typelog):
     data = []
     try:
         # split the log file into lines
-        file = file[1].split('\n')
+
+        file = file.split('\n')
 
         # process each line in the log file
         for line in file:
@@ -37,7 +44,7 @@ def createDataframe(file, typelog):
         df = pd.DataFrame(data, columns=['DateTime', 'LogLevel', 'Thread', 'content', 'Type'])
         df['DateTime'] = df['DateTime'].str.rsplit('-', n=1).str[0] + '-' + df['DateTime'].str.rsplit('-', n=1).str[-1].str.zfill(3)
         df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y-%m-%d %H:%M:%S-%f')
-
+        df = df.astype({'LogLevel':'category','Thread':'category','Type':'category'})
         return df
 
     # handle any exceptions that occur while creating the dataframe
