@@ -1,3 +1,4 @@
+
 # Import required libraries
 import dataFrames as dfs
 import queries as q
@@ -22,7 +23,7 @@ class LogAggreagator(Resource):
     def post(self):
         # Parse input arguments
         parser = reqparse.RequestParser()
-        parser.add_argument('AgentId', type=str,help='AgentId is a required field.',required=True)
+        parser.add_argument('AgentId', type=str,help='Agent Id is required field',required=True)
         parser.add_argument('filterList', type=list, location='json',help='filterList is required field.',required=True)
         parser.add_argument('startDatetime', type=str)
         parser.add_argument('endDatetime', type=str)
@@ -40,8 +41,6 @@ class LogAggreagator(Resource):
         logLevels = args['logLevels']
         files = args['files']
 
-        # Decode and split the file contents
-        x = base64.b64decode(files['ascwsfiles'][0][1]).decode().split('\n')
 
         # Initialize lists for each type of file
         ascwsList = []
@@ -50,19 +49,20 @@ class LogAggreagator(Resource):
 
         # Loop through the ascws files and add them to the ascws list
         for i in range(len(files['ascwsfiles'])):
-            ascwsList.append((files['ascwsfiles'][i][0], base64.b64decode(files['ascwsfiles'][i][1]).decode()))
+            ascwsList.append(base64.b64decode(files['ascwsfiles'][i]).decode())
 
         # Loop through the acdavaya files and add them to the acd list
         for i in range(len(files['acdavayafiles'])):
-            acdList.append((files['acdavayafiles'][i][0], base64.b64decode(files['acdavayafiles'][i][1]).decode()))
+            acdList.append(base64.b64decode(files['acdavayafiles'][i]).decode())
 
         # Loop through the swxevd files and add them to the swxevd list
         for i in range(len(files['swxevdfiles'])):
-            swxevdList.append((files['swxevdfiles'][i][0], base64.b64decode(files['swxevdfiles'][i][1]).decode()))
+            swxevdList.append(base64.b64decode(files['swxevdfiles'][i]).decode())
 
         # Initialize data frames for each type of file
         [ascwsDataFrames, acdDataFrames, swxevdDataFrames] = dfs.initializeDataFrames(ascwsList, acdList, swxevdList)
         # Query the data frames to get agent story
+        print(swxevdDataFrames)
         performanceData = q.performanceQuery(swxevdDataFrames)
         agentStory = q.queryFunction(ascwsDataFrames, acdDataFrames, swxevdDataFrames, AgentId, filterList, startDatetime, endDatetime, threadIds, logLevels)
         agentStory = agentStory.astype({"DateTime":str})
@@ -74,7 +74,7 @@ class LogAggreagator(Resource):
 
         data = {
             'performanceData':performanceData,
-            'agentStrory':json
+            'agentStory':json
         }
         if(data):
             # Return JSON response
@@ -93,11 +93,7 @@ api.add_resource(LogAggreagator, "/logAggregator")
 
 
 if __name__=="__main__":
-    app.run(debug=True)
-
-
-
-
+    app.run(debug=True,port=8111)
 
 
 
