@@ -3,90 +3,123 @@ import dataFrames as dfs
 import ascwsFunctions as asf
 import acdFunctions as acf
 import swxevdFunctions as swf
+from datetime import datetime
+import re
+
+def queryDateTime(startDateTime, endDateTime, df):
+    try:
+        resultSet = []
+        if(startDateTime):
+            startDateTime = datetime.strptime(startDateTime, '%Y-%m-%d %H:%M:%S.%f')
+        if(endDateTime):
+            endDateTime = datetime.strptime(endDateTime, '%Y-%m-%d %H:%M:%S.%f')
+        if(startDateTime and endDateTime):
+            resultSet = df.query(f"DateTime >= '{startDateTime}' and DateTime <='{endDateTime}'")
+        elif(not startDateTime):
+            resultSet = df.query(f"DateTime <= '{endDateTime}'")
+        elif(not endDateTime):
+            resultSet = df.query(f"DateTime >= '{startDateTime}'")
+        return resultSet
+    except Exception as e:
+        print(f"An error occurred while querying DateTime: {str(e)}")
+        return pd.DataFrame()
+
+def queryThreadId(threadIds, df):
+    try:
+        resultSet = []
+        if (threadIds):
+            resultSet = df.query(f"Thread in {threadIds}")
+        return resultSet
+    except Exception as e:
+        print(f"An error occurred while querying ThreadId: {str(e)}")
+        return pd.DataFrame()
+
+def queryLogLevel(logLevels, df):
+    try:
+        resultSet = []
+        if (logLevels):
+            resultSet = df.query(f"LogLevel in {logLevels}")
+        return resultSet
+    except Exception as e:
+        print(f"An error occurred while querying LogLevel: {str(e)}")
+        return pd.DataFrame()
+
+def queryFunction(ascwsDataFrames, acdDataFrames, swxevdDataFrames, agentId, filterList, startDateTime, endDateTime, threadIds, logLevels):
+    try:
+        agentStory = pd.DataFrame(columns=['DateTime', 'LogLevel', 'Thread', 'content', 'Type'])
+        frames = []
+        for df in acdDataFrames:
+            frames.append(acf.queryACD(agentId,df))
+        for df in ascwsDataFrames:
+            frames.append(asf.queryASCWS(agentId,df))
+        for df in swxevdDataFrames:
+            frames.append(swf.querySWXEVD(agentId,df))
+        agentStory = pd.concat(frames)
+        agentStoryCopy = agentStory
+        if('1' in filterList):
+            if(startDateTime and endDateTime):
+                agentStoryCopy = queryDateTime(startDateTime, endDateTime, agentStoryCopy)
+        if('2' in filterList):
+            print(threadIds)
+            if(threadIds):
+                agentStoryCopy = queryThreadId(threadIds, agentStoryCopy)
+        if('3' in filterList):
+            if(logLevels):
+                agentStoryCopy = queryLogLevel(logLevels, agentStoryCopy)
+        print(agentStoryCopy)
+        return agentStoryCopy
+    except Exception as e:
+        print(f"An error occurred while querying function: {str(e)}")
+        return pd.DataFrame()
 
 
-def queryDateTime(startDateTime,endDateTime,df):
-  resultSet = []
-
-  if(startDateTime and endDateTime):
-    resultSet = df.query(f"DateTime >= '{startDateTime}' and DateTime <='{endDateTime}'")
-  elif(not startDateTime):
-      resultSet = df.query(f"DateTime <= {endDateTime}")
-  elif(not endDateTime):
-      resultSet = df.query(f"DateTime >= {startDateTime}")
-
-  return resultSet
 
 
-def queryThreadId(threadIds,df):
-    resultSet = []
-    if (threadIds):
-        resultSet = df.query(f"Thread in {threadIds}")
+def getTotalTime(input_text):
+    pattern1 = re.compile(r"PT[0-9]+\.[0-9]{3}S")
+    return pattern1.search(input_text)
 
-    return resultSet
-
-def queryLogLevel(logLevels,df):
-    resultSet = []
-    if (logLevels):
-        resultSet = df.query(f"LogLevel in {logLevels}")
-
-    return resultSet
+def getIds(input_text):
+    pattern1 = re.compile(r"CustOid=customer[0-9]+, AcdId=[0-9]+, AgentId=[0-9]+, AgentLogon=[0-9]+")
+    return pattern1.search(input_text)
 
 
-def queryFunction(ascwsDataFrames,acdDataFrames,swxevdDataFrames):
+def performanceQuery(swxevdDataFrames):
+    if(swxevdDataFrames):
+        df = pd.concat(swxevdDataFrames)
+        df = df.query(f'content.str.contains("STATS: RTA Msg Finished processing")')
+        df.reset_index(inplace=True)
+        performanceData = []
+        for ind in df.index:
+            if(getTotalTime(df['content'][ind]) and getIds(df['content'][ind])):
+                time = getTotalTime(df['content'][ind])
+                [x, y] = time.span()
+                result = int(float(df['content'][ind][x+2:y-1])*1000)
 
-    agentId = str(input("Enter Agent Id you wish to filter by:"))
-    agentStory = pd.DataFrame(columns=['DateTime', 'LogLevel', 'Thread', 'content', 'Type'])
+                thread = df['Thread'][ind]
 
-    frames = []
+                ids = getIds(df['content'][ind])
+                [x,y] = ids.span()
+                text = df['content'][ind][x:y]
+                text = text.split(', ')
+                for i in range(len(text)):
+                    s = text[i]
+                    ind = s.find('=')
+                    text[i] = s[ind+1:]
+                customerId = text[0]
+                acdId = text[1]
+                agentId = text[2]
+                agentLogonId = text[3]
 
-    for df in acdDataFrames:
-        frames.append(acf.queryACD(agentId,df))
+                performanceData.append([thread,customerId,acdId,agentId,agentLogonId,result])
 
-    for df in ascwsDataFrames:
-        frames.append(asf.queryASCWS(agentId,df))
+                pdf = pd.DataFrame(performanceData,columns=['thread','customerId','acdId','agentId','agentLogonId','performance_time'])
 
-    for df in swxevdDataFrames:
-        frames.append((swf.querySWXEVD(agentId,df)))
-
-    agentStory = pd.concat(frames)
-
-    agentStoryCopy = agentStory
+        return pdf
+    return None
 
 
-    while(True):
-        print("1. Filter by DateTime")
-        print("2. Filter by threadIds")
-        print("3. Filter by Log Levels")
 
-        option = int(input("Enter the option that you wish to filter by:"))
 
-        if(option == 1):
-            startDateTime = str(input("Enter starting dateTime:"))
-            endDateTime = str(input("Enter ending dateTime:"))
-            agentStoryCopy = queryDateTime(startDateTime,endDateTime,agentStoryCopy)
 
-        elif(option == 2):
-            threadIds = []
-            n = int(input("Enter the number of threads you wish to track.(Enter 0 if not applicable):"))
-            if (n > 0):
-                print("Enter the threads to track:")
-                for i in range(n):
-                    threadIds.append(input())
 
-            agentStoryCopy = queryThreadId(threadIds,agentStoryCopy)
-        elif(option == 3):
-            logLevels = []
-            n = int(input("Enter the number of log levels you wish to track.(Enter 0 if not applicable):"))
-            if (n > 0):
-                print("Enter the log levels to track:")
-                for i in range(n):
-                    logLevels.append(input())
-
-            agentStoryCopy = queryLogLevel(logLevels,agentStoryCopy)
-
-        flag = int(input("Do you want to filter by any other field?(1 -> yes, 0 -> no):"))
-
-        if(flag == 0):
-            print(agentStoryCopy)
-            break
